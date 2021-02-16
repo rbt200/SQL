@@ -1,0 +1,342 @@
+CREATE DATABASE DentalDB_34
+
+USE DentalDB_34 
+
+/*
+DROP TABLE OrderLines
+DROP TABLE Orders
+DROP Table Patients
+DROP Table DentalServices
+DROP TABLE Employees
+DROP TABLE Ocupations
+*/
+
+---CREATE TABLES--------------------------------------------------------------------------------------------
+
+/* patients' info  */
+CREATE /*COLUMN*/ TABLE Patients
+(
+	patient_id int NOT NULL IDENTITY(1,1),
+	surname nvarchar(25) NOT NULL,
+	name nvarchar(25) NOT NULL,
+	patronimic nvarchar(25) NOT NULL DEFAULT '',
+	dob date NOT NULL,
+	email nvarchar(50) NOT NULL UNIQUE,
+	phone nvarchar(12) CHECK (Phone LIKE '([0-9][0-9][0-9])[0-9][0-9][0-9][0-9][0-9][0-9][0-9]') UNIQUE,
+	PRIMARY KEY(patient_id)
+)
+
+/* positions that can be ocupied by an employee */
+CREATE /*COLUMN*/ TABLE Ocupations
+(
+	ocupation_id int NOT NULL IDENTITY(1,1),
+	title nvarchar(50) UNIQUE,
+	PRIMARY KEY(ocupation_id)	
+)
+
+/* employees' info */
+CREATE /*COLUMN*/ TABLE Employees
+(
+	employee_id int NOT NULL IDENTITY(1,1),
+	ocupation_id int NOT NULL,
+	surname nvarchar(25) NOT NULL,
+	name nvarchar(25) NOT NULL,
+	patronimic nvarchar(25) NOT NULL DEFAULT '',
+    dob date NOT NULL,	
+	email nvarchar(255) NOT NULL UNIQUE,	
+	phone nvarchar(12) NOT NULL CHECK (Phone LIKE '([0-9][0-9][0-9])[0-9][0-9][0-9][0-9][0-9][0-9][0-9]') UNIQUE,
+	PRIMARY KEY (employee_id),
+	FOREIGN KEY (ocupation_id) REFERENCES Ocupations(ocupation_id)
+)
+
+/* services available */
+CREATE /*COLUMN*/ TABLE DentalServices 
+(
+	service_id int NOT NULL IDENTITY(1,1),
+	ocupation_id int NOT NULL,
+	description nvarchar(100) NOT NULL,
+	price decimal(8,2) NOT NULL DEFAULT '0.00',
+	PRIMARY  KEY(service_id),
+	FOREIGN KEY(ocupation_id) REFERENCES Ocupations(ocupation_id)
+)
+
+/* headers */
+CREATE /*COLUMN*/ TABLE Orders
+(
+	order_id int NOT NULL IDENTITY(1,1),
+	patient_id int NOT NULL,
+	discount decimal(5,2) NOT NULL DEFAULT '1.00',
+	total_price decimal(8,2) NOT NULL DEFAULT '0.00',
+	order_date date NOT NULL DEFAULT GETDATE(),
+	order_time time NOT NULL DEFAULT CURRENT_TIMESTAMP, 	
+	PRIMARY KEY(order_id),
+	FOREIGN KEY(patient_id) REFERENCES Patients(patient_id)
+)
+
+/* headers' lines */
+CREATE /*COLUMN*/ TABLE OrderLines
+(
+	order_id int NOT NULL,
+	line_id int NOT NULL, 
+	service_id int NOT NULL,
+	detail_date date NOT NULL DEFAULT GETDATE() ,
+	detail_time time NOT NULL DEFAULT CURRENT_TIMESTAMP, 
+	PRIMARY KEY(order_id, line_id),
+	FOREIGN KEY(order_id) REFERENCES Orders(order_id),
+	FOREIGN KEY(service_id) REFERENCES DentalServices(service_id)
+)
+
+
+---Add data----------------------------------------------------------------------------------------------------------------------
+
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Ivanov', 'Ivan', 'Ivanovich', '2000.10.10', 'ivanov.ivan@mail.ru', '(987)2223344');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Tokalenko', 'Sergei', 'Olegovic', '1987.12.01', 'sergej.tokalenko@gmail.com', '(999)9992211');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Belih', 'Artem', 'Bogdanovich', '2007.09.02', 'artem.belih@hotmail.com', '(323)9234352');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Panasenko', 'Igor', 'Ivanovich', '1972.11.21', 'mymail@mail.ru', '(923)2211333');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Andrushko', 'Andrej', 'Borisovich', '1988.08.29', 'admin@ukr.net', '(945)9483724');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Portnoj', 'Kondrat', 'Efimovich', '2001.07.15', 'portnoj@mail.ru', '(878)8844765');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Laptev', 'Kiril', 'Andreevich', '2010.03.22', 'kiril_my@wp.com', '(673)9876567');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Drakery', 'Anna', 'Alekseevna', '2002.04.28', 'order@dtr.net', '(097)4455676');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Kireeva', 'Ekaterina', 'Mikhailovna', '1950.06.24', 'partner@gov.us', '(067)9876879');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Koval', 'Irina', 'Andreevna', '1955.02.26', 'kartmen@qwer.ty', '(789)1233214');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Kovalenko', 'Olga', 'Petrovna', '1999.12.30', 'olga.kovalenko@gmail.com', '(890)8833994');
+INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Konovalova', 'Galina', 'Ivanovna', '2009.12.31', 'galina_konovalova@mail.ru', '(674)2323234');
+
+INSERT INTO Ocupations (title) VALUES ('Surgeon');
+INSERT INTO Ocupations (title) VALUES ('Dentist');
+INSERT INTO Ocupations (title) VALUES ('Nurse');
+INSERT INTO Ocupations (title) VALUES ('Dental Hygienist');
+INSERT INTO Ocupations (title) VALUES ('Dental Lab Technician');
+INSERT INTO Ocupations (title) VALUES ('General Dentist');
+INSERT INTO Ocupations (title) VALUES ('Endodontist');
+INSERT INTO Ocupations (title) VALUES ('Periodontist');
+INSERT INTO Ocupations (title) VALUES ('Dental Anesthesiologist');
+INSERT INTO Ocupations (title) VALUES ('Orthodontist');
+
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (3, 'Petrov', 'Petr', 'Petrovich', '1997.01.02', 'petr.petorv@mail.ru', '(786)9992231');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (1, 'Tarov', 'Boris', 'Arkadievich', '1978.05.07', 'boris.tarov@dental.com', '(964)9876546');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (2, 'Sergeeva', 'Anna', 'Petrovna', '2000', 'anna.sergeeva@dental.com', '(342)8097032');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (2, 'Garin', 'Aleksej', 'Sidorovich', '1964.01.20', 'aleksej.garin@dental.com', '(878)0834768');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (4, 'Kogan', 'Alena', 'Viktorovna', '1954.11.21', 'alena.kogan@dental.com', '(856)0839388');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (6, 'Dimov', 'Viktor', 'Tarasovich', '1998.06.10', 'viktor.dimov@dental.com', '(458)9784768');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (5, 'Dodon', 'Roman', 'Ivanovich', '2001.01.18', 'roman.dodon@dental.com', '(478)0827618');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (8, 'Parshina', 'Elena', 'Sidorovna', '1949.05.14', 'elena.parshina@dental.com', '(321)0894236');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (7, 'Garina', 'Maria', 'Sidorovna', '1966.09.12', 'maria.garina@dental.com', '(878)0834758');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (10, 'Borodina', 'Anastasiya', 'Yurivna', '1999.08.08', 'anastasiya.borodina@dental.com', '(067)9034768');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (9, 'Duka', 'Nadezhda', 'Andreevna', '2002.01.24', 'nadezhda.duka@dental.com', '(099)0834362');
+INSERT INTO Employees (ocupation_id, surname, name, patronimic, dob, email, phone) VALUES (1, 'Skorobogatov', 'Anatolija', 'Spiridonovich', '1977.09.03', 'anatolij.skorobogatov@dental.com', '(099)4834768');
+
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(2, 'Filling', '20.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(2, 'Rroot canals', '15.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(1, 'Extractions', '25.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(6, 'Complete exams', '10.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(5, 'X-ray', '10.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(4, 'Dental Check Up', '15.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(4, 'Decay removal', '5.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(10, 'Fixed bridge', '25.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(10, 'Implant-supported bridge', '30.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(4, 'Professional Cleaning', '20.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(10, 'Scaling and Root Planing', '10.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(4, 'Tooth Whitening', '15.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(10, 'Veneers', '25.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(10, 'Braces', '25.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(1, 'Wisdom teeth removal', '30.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(10, 'Crowns', '35.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(4, 'Enamel Shaping', '15.50');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(2, 'Tooth Filling', '20.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(1, 'Extraction of teeth', '35.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(2, 'Root canal therapy', '25.00');
+INSERT INTO DentalServices (ocupation_id, description, price) VALUES(3, 'Extra Care', '10.00');
+
+INSERT INTO Orders (patient_id, total_price) VALUES (5, '60.00');
+INSERT INTO Orders (patient_id, total_price) VALUES (11, '60.00');
+INSERT INTO Orders (patient_id, total_price) VALUES (3, '60.00');
+INSERT INTO Orders (patient_id, total_price) VALUES (7, '60.00');
+INSERT INTO Orders (patient_id, total_price) VALUES (5, '60.00');
+INSERT INTO Orders (patient_id, total_price) VALUES (2, '60.00');
+
+INSERT INTO OrderLines (order_id, service_id) VALUES (2, 3);
+INSERT INTO OrderLines (order_id, service_id) VALUES (2, 2);
+INSERT INTO OrderLines (order_id, service_id) VALUES (1, 21)
+INSERT INTO OrderLines (order_id, service_id) VALUES (1, 3);
+INSERT INTO OrderLines (order_id, service_id) VALUES (1, 5);
+INSERT INTO OrderLines (order_id, service_id) VALUES (3, 5);
+
+
+
+---TEST DB---------------------------------------------------------------------------------------------
+
+SELECT * FROM Orders;
+SELECT * FROM OrderLines;
+SELECT * FROM DentalServices;
+SELECT * FROM Ocupations;
+SELECT * FROM Patients;
+SELECT * FROM Employees;
+
+SELECT title AS 'Ocupation', surname, name, DentalServices.description AS 'Dental Service'
+FROM Orders
+INNER JOIN OrderLines
+ON Orders.order_id = OrderLines.order_id
+INNER JOIN DentalServices
+ON DentalServices.service_id = OrderLines.service_id
+INNER JOIN Ocupations
+ON Ocupations.ocupation_id = DentalServices.ocupation_id
+INNER JOIN Employees
+ON Employees.ocupation_id = Ocupations.ocupation_id
+WHERE OrderLines.line_id = 1
+AND Employees.employee_id = 1
+GO
+
+--------------Trigger ON table OrderLines--------------------------------------------------------------
+/*
+TRIGGER Instead_trigger ON table OrderLines
+set auto increment to column line_id 
+---DROP TRIGGER Instead_Trigger-
+*/
+CREATE TRIGGER Instead_trigger
+ON OrderLines
+INSTEAD OF INSERT
+AS
+BEGIN
+---declare local vars
+DECLARE @order_id INT
+DECLARE @line_id INT
+DECLARE @service_id INT
+DECLARE @detail_date DATE
+DECLARE @detail_time TIME
+---get data from the inserted line
+SELECT @order_id = order_id FROM inserted
+SELECT @service_id = service_id FROM inserted
+SELECT @detail_date = detail_date FROM inserted
+SELECT @detail_time = detail_time FROM inserted
+--check if inserted order_id exists in the table OrderLines
+IF NOT EXISTS (SELECT * FROM OrderLines WHERE order_id = @order_id)
+SET @line_id = 1
+ELSE
+---increase by one the last inserted line's number 
+SET @line_id = (SELECT MAX(OrderLines.line_id) + 1
+FROM OrderLines
+WHERE OrderLines.order_id = @order_id)
+---change the data in the inserted line
+INSERT INTO OrderLines (order_id, line_id, service_id, detail_date, detail_time)
+VALUES (@order_id, @line_id, @service_id, @detail_date, @detail_time)
+END
+GO
+
+
+-----------------------Procedure---------------------------------------------
+DECLARE @visits int
+EXEC usp_GetPatientVisitQty @visits OUTPUT
+
+PRINT CAST (@visits as nvarchar)
+GO
+/*
+Get the number of patient's visits
+---DROP PROC usp_GetPatientVisitQty-
+*/
+CREATE PROC usp_GetPatientVisitQty
+	@qtyVisits int = null OUTPUT ---the number of patient's visits
+AS
+BEGIN
+	SET @qtyVisits = (SELECT COUNT(*)
+						FROM Orders
+						WHERE patient_id = 5
+						)
+END
+GO
+
+--------------------Function GetPatientVisits------------------------------------------------
+/*
+Get the number of patient's visits
+---DROP FUNCTION GetPatientVisits-
+*/
+CREATE FUNCTION GetPatientVisits (@patient_id int)
+RETURNS int
+AS
+BEGIN
+DECLARE @qtyVisits int 
+SET @qtyVisits = (SELECT COUNT(*)
+						FROM Orders
+						WHERE patient_id = @patient_id
+						)
+RETURN @qtyVisits
+END
+GO
+
+PRINT dbo.GetPatientVisits(2)
+GO
+
+----------------------Function SetPatientDiscount --------------------------------
+/*
+set the level of patient's discount
+---DROP FUNCTION SetPatientDiscount-
+*/
+CREATE FUNCTION SetPatientDiscount (@patient_id int)
+RETURNS DECIMAL(5,2)
+AS 
+BEGIN
+	DECLARE @visit int;
+	DECLARE @discount DECIMAL(5,2)
+
+	SET @visit = dbo.GetPatientVisits(@patient_id)
+
+	IF @visit < 3 
+		SET @discount = '5.00'
+	ELSE
+		SET @discount = '10.00'
+
+	RETURN @discount
+END
+GO
+
+PRINT dbo.SetPatientDiscount(2)
+
+------------------------- Function  SetTotalPrice  ---------------------------------------------
+/*
+---DROP FUNCTION SetTotalPrice-
+*/
+CREATE FUNCTION SetTotalPrice (@order_id int, @patient_id int)---, @discount DECIMAL(5,2))
+RETURNS DECIMAL(5,2)
+AS
+BEGIN
+
+	DECLARE @price DECIMAL(5,2)
+	DECLARE @discount DECIMAL(5,2)
+
+	SELECT @price  = SUM(price)
+		FROM Orders
+		INNER JOIN OrderLines
+		ON Orders.order_id = OrderLines.order_id
+		INNER JOIN DentalServices
+		ON OrderLines.service_id = DentalServices.service_id
+		WHERE Orders.order_id = @order_id
+		AND Orders.patient_id = @patient_id
+
+	SET @discount = dbo.SetPatientDiscount(@patient_id)
+	SET @price = @price - @discount
+
+	RETURN @price
+
+END
+GO
+
+PRINT dbo.SetTotalPrice(1, 5)
+
+
+
+SELECT * FROM Orders;
+SELECT * FROM OrderLines;
+SELECT * FROM DentalServices;
+SELECT * FROM Ocupations;
+SELECT * FROM Patients;
+SELECT * FROM Employees;
+
+/*
+DECLARE @temp2 int = 2
+DECLARE @str nvarchar(10)
+SET @str = CASE @temp2
+	WHEN  2 THEN 'afd'			
+    WHEN  4 THEN 'ddd'
+	ELSE 'fff'
+	END
+*/
