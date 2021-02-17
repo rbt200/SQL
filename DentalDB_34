@@ -1,6 +1,6 @@
 CREATE DATABASE DentalDB_34
 
-USE DentalDB_34 
+USE DentalDB_34
 
 /*
 DROP TABLE OrderLines
@@ -16,7 +16,7 @@ DROP TABLE Ocupations
 /* patients' info  */
 CREATE /*COLUMN*/ TABLE Patients
 (
-	patient_id int NOT NULL IDENTITY(1,1),
+	patient_id int NOT NULL IDENTITY(1,1), ---UNSIGNED
 	surname nvarchar(25) NOT NULL,
 	name nvarchar(25) NOT NULL,
 	patronimic nvarchar(25) NOT NULL DEFAULT '',
@@ -29,7 +29,7 @@ CREATE /*COLUMN*/ TABLE Patients
 /* positions that can be ocupied by an employee */
 CREATE /*COLUMN*/ TABLE Ocupations
 (
-	ocupation_id int NOT NULL IDENTITY(1,1),
+	ocupation_id int NOT NULL IDENTITY(1,1),  ---UNSIGNED
 	title nvarchar(50) UNIQUE,
 	PRIMARY KEY(ocupation_id)	
 )
@@ -37,7 +37,7 @@ CREATE /*COLUMN*/ TABLE Ocupations
 /* employees' info */
 CREATE /*COLUMN*/ TABLE Employees
 (
-	employee_id int NOT NULL IDENTITY(1,1),
+	employee_id int NOT NULL IDENTITY(1,1),  ---UNSIGNED
 	ocupation_id int NOT NULL,
 	surname nvarchar(25) NOT NULL,
 	name nvarchar(25) NOT NULL,
@@ -52,7 +52,7 @@ CREATE /*COLUMN*/ TABLE Employees
 /* services available */
 CREATE /*COLUMN*/ TABLE DentalServices 
 (
-	service_id int NOT NULL IDENTITY(1,1),
+	service_id int NOT NULL IDENTITY(1,1),  ---UNSIGNED
 	ocupation_id int NOT NULL,
 	description nvarchar(100) NOT NULL,
 	price decimal(8,2) NOT NULL DEFAULT '0.00',
@@ -63,7 +63,7 @@ CREATE /*COLUMN*/ TABLE DentalServices
 /* headers */
 CREATE /*COLUMN*/ TABLE Orders
 (
-	order_id int NOT NULL IDENTITY(1,1),
+	order_id int NOT NULL IDENTITY(1,1),  ---UNSIGNED
 	patient_id int NOT NULL,
 	discount decimal(5,2) NOT NULL DEFAULT '1.00',
 	total_price decimal(8,2) NOT NULL DEFAULT '0.00',
@@ -76,9 +76,9 @@ CREATE /*COLUMN*/ TABLE Orders
 /* headers' lines */
 CREATE /*COLUMN*/ TABLE OrderLines
 (
-	order_id int NOT NULL,
-	line_id int NOT NULL, 
-	service_id int NOT NULL,
+	order_id int NOT NULL,    ---UNSIGNED
+	line_id int NOT NULL,     ---UNSIGNED
+	service_id int NOT NULL,  ---UNSIGNED
 	detail_date date NOT NULL DEFAULT GETDATE() ,
 	detail_time time NOT NULL DEFAULT CURRENT_TIMESTAMP, 
 	PRIMARY KEY(order_id, line_id),
@@ -148,18 +148,20 @@ INSERT INTO DentalServices (ocupation_id, description, price) VALUES(1, 'Extract
 INSERT INTO DentalServices (ocupation_id, description, price) VALUES(2, 'Root canal therapy', '25.00');
 INSERT INTO DentalServices (ocupation_id, description, price) VALUES(3, 'Extra Care', '10.00');
 
-INSERT INTO Orders (patient_id, total_price) VALUES (5, '60.00');
-INSERT INTO Orders (patient_id, total_price) VALUES (11, '60.00');
-INSERT INTO Orders (patient_id, total_price) VALUES (3, '60.00');
-INSERT INTO Orders (patient_id, total_price) VALUES (7, '60.00');
-INSERT INTO Orders (patient_id, total_price) VALUES (5, '60.00');
-INSERT INTO Orders (patient_id, total_price) VALUES (2, '60.00');
+INSERT INTO Orders (patient_id) VALUES (5);
+INSERT INTO Orders (patient_id) VALUES (11);
+INSERT INTO Orders (patient_id) VALUES (3);
+INSERT INTO Orders (patient_id) VALUES (7);
+INSERT INTO Orders (patient_id) VALUES (5);
+INSERT INTO Orders (patient_id) VALUES (5);
+INSERT INTO Orders (patient_id) VALUES (2);
 
 INSERT INTO OrderLines (order_id, service_id) VALUES (2, 3);
 INSERT INTO OrderLines (order_id, service_id) VALUES (2, 2);
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 21)
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 3);
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 5);
+INSERT INTO OrderLines (order_id, service_id) VALUES (1, 7);
 INSERT INTO OrderLines (order_id, service_id) VALUES (3, 5);
 
 
@@ -223,6 +225,82 @@ VALUES (@order_id, @line_id, @service_id, @detail_date, @detail_time)
 END
 GO
 
+/*
+TRIGGER Instead_trigger ON table OrderLines
+set auto increment to column line_id 
+---DROP TRIGGER Instead_Trigger_discount-
+*/
+CREATE TRIGGER Instead_trigger_discount
+ON OrderLines
+FOR INSERT
+AS
+BEGIN
+---declare local vars
+DECLARE @patient_id INT
+
+DECLARE @order_id INT
+DECLARE @line_id INT
+DECLARE @service_id INT
+DECLARE @detail_date DATE
+DECLARE @detail_time TIME
+
+---get data from the inserted line
+SELECT @order_id = order_id FROM inserted
+SELECT @service_id = service_id FROM inserted
+SELECT @detail_date = detail_date FROM inserted
+SELECT @detail_time = detail_time FROM inserted
+
+SELECT  @patient_id = patient_id   
+FROM Orders 
+INNER JOIN OrderLines
+ON Orders.order_id = @order_id
+
+
+PRINT dbo.SetPatientDiscount(@patient_id) 
+
+UPDATE Orders
+---SET Orders.total_price = '99.00'
+SET Orders.discount = dbo.SetPatientDiscount(@patient_id) 
+WHERE Orders.order_id = @order_id
+/*
+---change the data in the inserted line
+INSERT INTO OrderLines (order_id, line_id, service_id, detail_date, detail_time)
+VALUES (@order_id, @line_id, @service_id, @detail_date, @detail_time)
+*/
+END
+GO
+
+/*
+---DROP TRIGGER Instead_Trigger_discount-
+
+CREATE TRIGGER Instead_trigger_discount
+ON Orders
+INSTEAD OF INSERT
+AS
+BEGIN
+---declare local vars
+DECLARE @order_id INT
+DECLARE @patient_id INT
+DECLARE @discount DECIMAL(5,2)
+DECLARE @total_price DECIMAL(8,2)
+DECLARE @order_date DATE
+DECLARE @order_time TIME
+---get data from the inserted line
+SELECT @order_id = order_id FROM inserted
+SELECT @patient_id = patient_id FROM inserted
+SELECT @discount = discount FROM inserted
+SELECT @total_price = total_price FROM inserted
+SELECT @order_date = order_date FROM inserted
+SELECT @order_time = order_time FROM inserted
+--check if inserted order_id exists in the table Orders
+SELECT * FROM Orders WHERE order_id = @order_id
+SET @discount = '3.00'--- dbo.SetPatientDiscount(@patient_id) 
+---change the data in the inserted line
+INSERT INTO Orders (order_id, patient_id, discount, total_price, order_date, order_time)
+VALUES (@order_id, @patient_id, @discount, @total_price, @order_date, @order_time)
+END
+GO
+*/
 
 -----------------------Procedure---------------------------------------------
 DECLARE @visits int
@@ -254,12 +332,17 @@ CREATE FUNCTION GetPatientVisits (@patient_id int)
 RETURNS int
 AS
 BEGIN
+/*
 DECLARE @qtyVisits int 
 SET @qtyVisits = (SELECT COUNT(*)
 						FROM Orders
 						WHERE patient_id = @patient_id
 						)
 RETURN @qtyVisits
+*/
+RETURN (SELECT COUNT(*)
+						FROM Orders
+						WHERE patient_id = @patient_id)
 END
 GO
 
@@ -270,7 +353,7 @@ GO
 /*
 set the level of patient's discount
 ---DROP FUNCTION SetPatientDiscount-
-*/
+
 CREATE FUNCTION SetPatientDiscount (@patient_id int)
 RETURNS DECIMAL(5,2)
 AS 
@@ -280,11 +363,38 @@ BEGIN
 
 	SET @visit = dbo.GetPatientVisits(@patient_id)
 
-	IF @visit < 3 
-		SET @discount = '5.00'
-	ELSE
-		SET @discount = '10.00'
+SET @discount = CASE 
+					WHEN @visit <=3 THEN '5.00'
+					WHEN @visit <=5 THEN '10.00'
+					WHEN @visit <=10 THEN '15.00'
+					ELSE '20.00'
+				END
 
+	RETURN @discount
+END
+GO
+*/
+
+CREATE FUNCTION SetPatientDiscount (@patient_id int)
+RETURNS DECIMAL(5,2)
+AS 
+BEGIN
+	DECLARE @visit int;
+	DECLARE @discount DECIMAL(5,2)
+
+	SET @visit = (SELECT COUNT(*)
+						FROM OrderLines AS Lines
+						LEFT OUTER JOIN Orders AS Orders
+						ON Lines.order_id = Orders.order_id
+						WHERE Orders.patient_id =  @patient_id)
+
+SET @discount = CASE 
+					WHEN @visit <=3 THEN '5.00'
+					WHEN @visit <=5 THEN '10.00'
+					WHEN @visit <=10 THEN '15.00'
+					ELSE '20.00'
+				END
+					
 	RETURN @discount
 END
 GO
@@ -331,12 +441,25 @@ SELECT * FROM Ocupations;
 SELECT * FROM Patients;
 SELECT * FROM Employees;
 
-/*
+
 DECLARE @temp2 int = 2
 DECLARE @str nvarchar(10)
-SET @str = CASE @temp2
-	WHEN  2 THEN 'afd'			
-    WHEN  4 THEN 'ddd'
-	ELSE 'fff'
+DECLARE @int int
+SET @int = CASE
+	WHEN  @temp2 < 2 THEN 100			
+    WHEN  @temp2 > 4 THEN 200
+	ELSE 300
 	END
+
+	PRINT @int
+
+
+/*
+	--Simple CASE expression:   
+DECLARE @temp3 int 
+SET @temp3 = 2
+CASE @temp3 
+     WHEN @temp3 > 1 THEN PRINT 'ere'  
+     ---ELSE PRINT 'Error'
+END   
 */
