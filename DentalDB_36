@@ -7,13 +7,6 @@ DROP Table DentalServices
 DROP TABLE Employees
 DROP TABLE Ocupations
 
-DROP FUNCTION GetPatientDiscount
-DROP FUNCTION GetTotalPrice
-
-DROP TRIGGER Instead_Trigger
-DROP TRIGGER Update_trigger_discount
-DROP TRIGGER Insert_trigger_total_price
-
 USE MASTER
 DROP DATABASE DentalDB_36
 
@@ -26,17 +19,7 @@ GO
 USE DentalDB_36
 GO
 
-
-------------------------------------------CREATE TABLES---------------------------------------------------
-
-/*
-DROP TABLE OrderLines
-DROP TABLE Orders
-DROP Table Patients
-DROP Table DentalServices
-DROP TABLE Employees
-DROP TABLE Ocupations
-*/
+--------------------------------CREATE TABLES----------------------
 
 /*
 patients' info  
@@ -109,7 +92,7 @@ CREATE /*COLUMN*/ TABLE Orders
 (
 	order_id int NOT NULL IDENTITY(1,1),  ---UNSIGNED
 	patient_id int NOT NULL,
-	discount decimal(5,2) NOT NULL DEFAULT '0.00',
+	discount decimal(5,2) NOT NULL DEFAULT '0.00', ---(discount in %)
 	total_price decimal(8,2) NOT NULL DEFAULT '0.00',
 	order_date date NOT NULL DEFAULT GETDATE(),
 	order_time time NOT NULL DEFAULT CURRENT_TIMESTAMP, 	
@@ -134,17 +117,13 @@ CREATE /*COLUMN*/ TABLE OrderLines
 	FOREIGN KEY(service_id) REFERENCES DentalServices(service_id)
 )
 GO
-
---------------------------------END OF TABLES-----------------------------------------------
+--------------------------------END OF TABLES-------------------------------------------
 
 
 ------------------FUNCTIONS-------------------------------------------------------------
-/*
-DROP FUNCTION GetPatientDiscount
-DROP FUNCTION GetTotalPrice
-*/
 
 /*
+Discount is in %
 DROP FUNCTION GetPatientDiscount
 */
 CREATE FUNCTION GetPatientDiscount (@patient_id int)
@@ -153,35 +132,32 @@ AS
 BEGIN
 	DECLARE @visit int;
 	DECLARE @discount DECIMAL(5,2)
-
 	SET @visit = (SELECT COUNT(*)
 						FROM OrderLines AS Lines
-						LEFT OUTER JOIN Orders AS Orders
+						INNER JOIN Orders AS Orders
 						ON Lines.order_id = Orders.order_id
-						WHERE Orders.patient_id =  @patient_id)
-
+						WHERE Orders.patient_id = @patient_id)
 	SET @discount = CASE 
-					WHEN @visit <=3 THEN '5.00'
-					WHEN @visit <=5 THEN '10.00'
-					WHEN @visit <=10 THEN '15.00'
-					ELSE '20.00'
-				END
-					
+						WHEN @visit < 3 THEN '5.00'
+						WHEN @visit < 5 THEN '10.00'
+						WHEN @visit < 7 THEN '15.00'
+						ELSE '20.00'
+				    END					
 	RETURN @discount
 END
 GO
 
 /*
+Collect the sum of money that the patient spent for the distinct order
+including the discount in %
 DROP FUNCTION GetTotalPrice
 */
 CREATE FUNCTION GetTotalPrice (@order_id int, @patient_id int)
 RETURNS DECIMAL(5,2)
 AS
 BEGIN
-
 	DECLARE @price DECIMAL(5,2)
 	DECLARE @discount DECIMAL(5,2)
-
 	SELECT @price  = SUM(price)
 		FROM Orders
 		INNER JOIN OrderLines
@@ -190,133 +166,93 @@ BEGIN
 		ON OrderLines.service_id = DentalServices.service_id
 		WHERE Orders.order_id = @order_id
 		AND Orders.patient_id = @patient_id
-
 	SET @discount = dbo.GetPatientDiscount(@patient_id)
-	SET @price = @price - @discount
-
+	SET @price = @price - ((@price * @discount) / 100)
 	RETURN @price
-
 END
 GO
-----------------------------END OF FUNCTIONS-----------------------------------------------------------
+----------------------------END OF FUNCTIONS----------------------------------
 
 -----------------------------------------TRIGGERS-----------------------------
 /*
-DROP TRIGGER Instead_Trigger
-DROP TRIGGER Update_trigger_discount
-DROP TRIGGER Insert_trigger_total_price
+Set auto increment to column line_id of table OrderLines
+DROP TRIGGER Instead_Trigger_OrderLines
 */
-
-/*
-Set auto increment to column line_id 
-DROP TRIGGER Instead_Trigger
-*/
-CREATE TRIGGER Instead_trigger_line_id
+CREATE TRIGGER Instead_Trigger_OrderLines
 ON OrderLines
 INSTEAD OF INSERT
 AS
 BEGIN
 ---declare local vars
-DECLARE @order_id INT
-DECLARE @line_id INT
-DECLARE @service_id INT
-DECLARE @detail_date DATE
-DECLARE @detail_time TIME
+	DECLARE @order_id INT
+	DECLARE @line_id INT
+	DECLARE @service_id INT
+	DECLARE @detail_date DATE
+	DECLARE @detail_time TIME
 ---get data from the system table
-SELECT @order_id = order_id FROM inserted
-SELECT @service_id = service_id FROM inserted
-SELECT @detail_date = detail_date FROM inserted
-SELECT @detail_time = detail_time FROM inserted
+	SELECT @order_id = order_id FROM inserted
+	SELECT @service_id = service_id FROM inserted
+	SELECT @detail_date = detail_date FROM inserted
+	SELECT @detail_time = detail_time FROM inserted
 --check if inserted order_id exists in the table OrderLines
-IF NOT EXISTS (SELECT * FROM OrderLines WHERE order_id = @order_id)
-SET @line_id = 1
-ELSE
+	IF NOT EXISTS (SELECT * FROM OrderLines WHERE order_id = @order_id)
+		SET @line_id = 1;
+	ELSE
 ---increase by one the last inserted line's number 
-SET @line_id = (SELECT MAX(OrderLines.line_id) + 1
-FROM OrderLines
-WHERE OrderLines.order_id = @order_id)
+	SET @line_id = (SELECT MAX(OrderLines.line_id) + 1
+						FROM OrderLines
+						WHERE OrderLines.order_id = @order_id);
 ---change the data in the inserted line
-INSERT INTO OrderLines (order_id, line_id, service_id, detail_date, detail_time)
-VALUES (@order_id, @line_id, @service_id, @detail_date, @detail_time)
+	INSERT INTO OrderLines (order_id, line_id, service_id, detail_date, detail_time)
+	VALUES (@order_id, @line_id, @service_id, @detail_date, @detail_time)
 END
 GO
 
 /*
 Update field discount depanding on the quantity of lines in the order
-Applies to each order separetly
-
-DROP TRIGGER Update_trigger_discount
+Apply globaly to the current order
+DROP TRIGGER After_Insert_Trigger_OrderLines
 */
-CREATE TRIGGER Update_trigger_discount
+CREATE TRIGGER After_Insert_Trigger_OrderLines
 ON OrderLines
-FOR INSERT
+AFTER INSERT
 AS
 BEGIN
 ---declare local vars
-DECLARE @patient_id INT
-DECLARE @order_id INT
-DECLARE @line_id INT
-DECLARE @service_id INT
-DECLARE @detail_date DATE
-DECLARE @detail_time TIME
----get data from the inserted line
-SELECT @order_id = order_id FROM inserted
-SELECT @service_id = service_id FROM inserted
-SELECT @detail_date = detail_date FROM inserted
-SELECT @detail_time = detail_time FROM inserted
-
-SELECT  @patient_id = patient_id   
-FROM Orders 
-INNER JOIN OrderLines
-ON Orders.order_id = @order_id
-
-UPDATE Orders
-SET Orders.discount = dbo.GetPatientDiscount(@patient_id) 
-WHERE Orders.order_id = @order_id
-END
-GO
-
-/*
-DROP TRIGGER Insert_trigger_total_price
-*/
-CREATE TRIGGER Insert_trigger_total_price
-ON OrderLines
-FOR INSERT
-AS
-BEGIN
----declare local vars
-DECLARE @total_sum DECIMAL(8,2)
-DECLARE @discount DECIMAL(5,3)
-DECLARE @order_id INT
-DECLARE @line_id INT
-DECLARE @service_id INT
-DECLARE @detail_date DATE
-DECLARE @detail_time TIME
----get data from the inserted line
-SELECT @order_id = order_id FROM inserted
-SELECT @service_id = service_id FROM inserted
-SELECT @detail_date = detail_date FROM inserted
-SELECT @detail_time = detail_time FROM inserted
----get discount for this order
-SELECT @discount = discount
-FROM Orders
-WHERE order_id = @order_id
----get total sum of money spent on this order
-SELECT @total_sum = SUM(price) 
-FROM OrderLines
-INNER JOIN DentalServices
-ON DentalServices.service_id = OrderLines.service_id
-WHERE OrderLines.order_id = @order_id
----update/set new data to the total sum of money spent (with discount)
-UPDATE Orders
-SET Orders.total_price = @total_sum - @discount
-WHERE Orders.order_id = @order_id
+	DECLARE @total_sum DECIMAL(8,2)
+	DECLARE @discount DECIMAL(5,3)
+	DECLARE @patient_id INT
+	DECLARE @order_id INT
+	DECLARE @line_id INT
+	DECLARE @service_id INT
+	DECLARE @detail_date DATE
+	DECLARE @detail_time TIME
+---get data from the last inserted line
+	SELECT @order_id = order_id FROM inserted
+	SELECT @line_id = line_id FROM inserted
+	SELECT @service_id = service_id FROM inserted
+	SELECT @detail_date = detail_date FROM inserted
+	SELECT @detail_time = detail_time FROM inserted
+---get current patient
+	SELECT @patient_id = patient_id  
+	FROM Orders 
+	INNER JOIN OrderLines
+	ON Orders.order_id = @order_id
+---get percents of discount
+	SET @discount = dbo.GetPatientDiscount(@patient_id) 
+	UPDATE Orders
+	SET Orders.discount = @discount
+	WHERE Orders.order_id = @order_id
+---update/set the total sum of money spent (with discount in %)
+	UPDATE Orders
+	SET Orders.total_price = dbo.GetTotalPrice (@order_id, @patient_id)
+	WHERE Orders.order_id = @order_id
 END
 GO
 
 --------------------------END OF TRIGGERS-------------------------------------------------------
 
--------------------------------FILL THE DATA IN----------------------------------------------------------------------------------------------------------------------
+-------------------------------FILL THE DATA IN-------------------------------------------------
 
 INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Ivanov', 'Ivan', 'Ivanovich', '2000.10.10', 'ivanov.ivan@mail.ru', '(987)2223344');
 INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Tokalenko', 'Sergei', 'Olegovic', '1987.12.01', 'sergej.tokalenko@gmail.com', '(999)9992211');
@@ -381,10 +317,6 @@ INSERT INTO DentalServices (ocupation_id, description, price) VALUES(2, 'Root ca
 INSERT INTO DentalServices (ocupation_id, description, price) VALUES(3, 'Extra Care', '10.00');
 GO
 
------------Add Orders and Orders' lines------------------------
-/*
-Fill in the table Orders only after adding Functions and Triggers
-*/
 INSERT INTO Orders (patient_id) VALUES (5);
 INSERT INTO Orders (patient_id) VALUES (11);
 INSERT INTO Orders (patient_id) VALUES (3);
@@ -392,20 +324,20 @@ INSERT INTO Orders (patient_id) VALUES (7);
 INSERT INTO Orders (patient_id) VALUES (5);
 INSERT INTO Orders (patient_id) VALUES (5);
 INSERT INTO Orders (patient_id) VALUES (2);
+INSERT INTO Orders (patient_id) VALUES (2);
+INSERT INTO Orders (patient_id) VALUES (4);
 GO
 
-/*
-Fill in the table OrderLines only after adding Functions and Triggers
-*/
-INSERT INTO OrderLines (order_id, service_id) VALUES (2, 3);
-INSERT INTO OrderLines (order_id, service_id) VALUES (2, 2);
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 21)
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 3);
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 5);
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 7);
+INSERT INTO OrderLines (order_id, service_id) VALUES (2, 3);
+INSERT INTO OrderLines (order_id, service_id) VALUES (2, 2);
 INSERT INTO OrderLines (order_id, service_id) VALUES (3, 5);
 INSERT INTO OrderLines (order_id, service_id) VALUES (4, 8);
 INSERT INTO OrderLines (order_id, service_id) VALUES (6, 9);
+INSERT INTO OrderLines (order_id, service_id) VALUES (8, 4);
 GO
 
 ------------------TEST DB--------------------------------------------------
