@@ -1,5 +1,7 @@
 ------------------TEST DentalDB_37--------------------------------------------------
 
+USE DentalDB_37
+
 /*
 SELECT * FROM Orders;
 SELECT * FROM OrderLines;
@@ -7,6 +9,9 @@ SELECT * FROM DentalServices;
 SELECT * FROM Ocupations;
 SELECT * FROM Patients;
 SELECT * FROM Employees;
+
+DELETE FROM  OrderLines WHERE order_id = 4
+DELETE FROM Orders WHERE order_id = 3
 
 SELECT title AS 'Ocupation', surname, name, DentalServices.description AS 'Dental Service'
 FROM Orders
@@ -74,6 +79,13 @@ WHERE OrderLines.line_id = 1
 AND Employees.employee_id = 1
 GO
 
+
+
+/*
+DROP PROCEDURE  spGetData_1
+*/
+CREATE PROCEDURE spGetData_1
+AS
 DECLARE @patient_id INT
 DECLARE @order_id INT
 
@@ -87,3 +99,92 @@ PRINT dbo.GetQtyOfPatientVisits(@patient_id)
 PRINT dbo.GetPatientDiscount(@patient_id)
 PRINT dbo.GetPriceWithDiscount(@order_id)
 PRINT dbo.GetPriceNoDiscount(@order_id)
+GO
+
+EXEC spGetData_1
+GO
+
+
+/*
+DROP PROCEDURE  spGetData_2
+*/
+CREATE PROCEDURE spGetData_2
+@order_id INT
+AS
+DECLARE @patient_id INT
+
+SELECT @patient_id = patient_id
+FROM Orders AS odr
+INNER JOIN OrderLines AS line
+ON odr.order_id = line.order_id
+WHERE odr.order_id = @order_id
+
+PRINT dbo.GetQtyOfPatientVisits(@patient_id) 
+PRINT dbo.GetPatientDiscount(@patient_id)
+PRINT dbo.GetPriceWithDiscount(@order_id)
+PRINT dbo.GetPriceNoDiscount(@order_id)
+GO
+
+EXEC spGetData_2 1
+GO
+
+
+EXEC spDisplayReciept 1
+GO
+
+
+
+CREATE FUNCTION ComposeReciept
+(
+	@order_id AS INT,
+	@patient_id INT,
+	@patient_surname nvarchar(25),
+	@patient_name nvarchar(25),
+	@result  NVARCHAR(MAX),
+	@line_qty INT,
+	@order_date DATE,
+	@order_time TIME,
+	@dob DATE
+)
+RETURNS @OutputTable TABLE
+(
+
+)
+AS
+BEGIN
+
+RETURN
+END
+
+---DROP TABLE #MaleStudents
+CREATE TABLE #MaleStudents
+(
+	name NVARCHAR(50),
+	age int,
+	gender NVARCHAR (50)
+
+)
+
+INSERT INTO #MaleStudents
+VALUES
+('John', 20, 'male')
+
+CREATE FUNCTION DisplayTempTrable (@inputtable AS TABLE)
+RETURNS INT
+AS
+BEGIN
+
+
+
+
+
+DECLARE @name nvarchar(50)
+DECLARE @age INT
+DECLARE @gender NVARCHAR(50)
+
+SELECT @name = name, @age = age, @gender = gender FROM #MaleStudents WHERE age > 10
+PRINT (@name + ' ' + CAST(@age AS NVARCHAR) + ' ' + @gender)
+
+RETURN 0
+END
+GO
