@@ -1,4 +1,6 @@
 /*
+
+DROP PROCEDURE spDisplayReciept
 DROP FUNCTION GetQtyOfPatientVisits
 DROP FUNCTION GetPatientDiscount
 DROP FUNCTION GetPriceNoDiscount
@@ -14,6 +16,7 @@ DROP TABLE Ocupations
 
 USE MASTER
 DROP DATABASE DentalDB_37
+
 */
 
 CREATE DATABASE DentalDB_37
@@ -68,7 +71,7 @@ CREATE /*COLUMN*/ TABLE Employees
 	email NVARCHAR(255) NOT NULL UNIQUE,	
 	phone NVARCHAR(12) NOT NULL CHECK (Phone LIKE '([0-9][0-9][0-9])[0-9][0-9][0-9][0-9][0-9][0-9][0-9]') UNIQUE,
 	PRIMARY KEY (employee_id),
-	FOREIGN KEY (ocupation_id) REFERENCES Ocupations(ocupation_id)
+	FOREIGN KEY (ocupation_id) REFERENCES Ocupations(ocupation_id) ON DELETE CASCADE
 )
 GO
 
@@ -83,7 +86,7 @@ CREATE /*COLUMN*/ TABLE DentalServices
 	description NVARCHAR(100) NOT NULL,
 	price DECIMAL(8,2) NOT NULL DEFAULT '0.00',
 	PRIMARY  KEY(service_id),
-	FOREIGN KEY(ocupation_id) REFERENCES Ocupations(ocupation_id)
+	FOREIGN KEY(ocupation_id) REFERENCES Ocupations(ocupation_id) ON DELETE CASCADE
 )
 GO
 
@@ -98,7 +101,7 @@ CREATE /*COLUMN*/ TABLE Orders
 	order_date DATE NOT NULL DEFAULT GETDATE(),
 	order_time TIME NOT NULL DEFAULT CURRENT_TIMESTAMP, 	
 	PRIMARY KEY(order_id),
-	FOREIGN KEY(patient_id) REFERENCES Patients(patient_id)
+	FOREIGN KEY(patient_id) REFERENCES Patients(patient_id) ON DELETE CASCADE
 )
 GO 
 
@@ -114,11 +117,63 @@ CREATE /*COLUMN*/ TABLE OrderLines
 	detail_date DATE NOT NULL DEFAULT GETDATE() ,
 	detail_time TIME NOT NULL DEFAULT CURRENT_TIMESTAMP, 
 	PRIMARY KEY(order_id, line_id),
-	FOREIGN KEY(order_id) REFERENCES Orders(order_id),
-	FOREIGN KEY(service_id) REFERENCES DentalServices(service_id)
+	FOREIGN KEY(order_id) REFERENCES Orders(order_id) ON DELETE CASCADE,
+	FOREIGN KEY(service_id) REFERENCES DentalServices(service_id) ON DELETE CASCADE
 )
 GO
 ---------------------END OF TABLES-------------------------------------------
+
+---------------------PROCEDURES-------------------------------------------------------
+/*
+Display detailed receipt
+DROP PROCEDURE spDisplayReciept
+*/
+CREATE PROCEDURE spDisplayReciept
+@odr_id INT
+AS
+BEGIN
+	DECLARE @order_id AS INT
+	DECLARE @patient_id INT
+	DECLARE @patient_surname nvarchar(25)
+	DECLARE @patient_name nvarchar(25)
+	DECLARE @result  NVARCHAR(MAX)
+	DECLARE @line_qty INT
+	DECLARE @order_date DATE
+	DECLARE @order_time TIME
+	DECLARE @dob DATE
+	DECLARE @counter INT
+	DECLARE @line_of_symbols NVARCHAR(100) = '*'
+
+	---Collect data for reciept
+	SELECT @order_id = odr.order_id, @patient_id = odr.patient_id, @patient_surname = ptn.surname, @dob = ptn.dob,
+		  @patient_name = ptn.name, @line_qty = COUNT(line.line_id), @order_date = order_date, @order_time = order_time
+	FROM Orders AS odr
+	INNER JOIN OrderLines AS line
+	ON odr.order_id = line.order_id
+	INNER JOIN Patients AS ptn
+	ON odr.patient_id = ptn.patient_id
+	WHERE odr.order_id = 1---@odr_id
+	GROUP BY odr.order_id, odr.patient_id, ptn.surname, ptn.name, odr.order_date, odr.order_time, ptn.dob ;
+
+		---Display the collected data
+	PRINT REPLICATE(@line_of_symbols , 50 ) 
+	PRINT 'Order details:'
+	PRINT ''
+	PRINT CONCAT('Order ID                     = ', @order_id)
+	PRINT CONCAT('Patient ID                   = ', @patient_id)
+	PRINT CONCAT(CONCAT('Patient Surname and Name     = ', (@patient_surname), ' '), @patient_name)
+	PRINT CONCAT('DOB                          = ', CONVERT(varchar, @dob, 107))
+	PRINT CONCAT('Qty of services              = ', dbo.GetQtyOfPatientVisits(@patient_id))
+	PRINT CONCAT('Total price with no discount = ', dbo.GetPriceNoDiscount(@order_id))
+	PRINT CONCAT('Percentage of discount       = ', dbo.GetPatientDiscount(@patient_id), '%')
+	PRINT CONCAT('Total price with discount    = ', dbo.GetPriceWithDiscount(@order_id))
+	PRINT CONCAT('Saved                        = ', (dbo.GetPriceNoDiscount(@order_id) - dbo.GetPriceWithDiscount(@order_id)))
+	PRINT CONCAT('Order created on             = ', CONVERT(varchar, @order_date, 107)) 
+	PRINT CONCAT('Order created at             = ', CONVERT(varchar, @order_time, 108))
+	PRINT REPLICATE(@line_of_symbols , 50 ) 
+END
+GO
+---------------------END OF PROCEDURES------------------------------------------------
 
 ---------------------FUNCTIONS-------------------------------------------------------------
 /*
@@ -240,7 +295,7 @@ BEGIN
 	VALUES (@order_id, @line_id, @service_id, @detail_date, @detail_time)
 END
 GO
----------------------END OF TRIGGERS-------------------------------------------------------
+---------------------END OF TRIGGERS--------------------------------------------------
 
 ---------------------FILL THE DATA IN-------------------------------------------------
 INSERT INTO Patients (surname, name, patronimic, dob, email, phone) VALUES ('Ivanov', 'Ivan', 'Ivanovich', '2000.10.10', 'ivanov.ivan@mail.ru', '(987)2223344');
@@ -330,3 +385,4 @@ INSERT INTO OrderLines (order_id, service_id) VALUES (8, 4);
 INSERT INTO OrderLines (order_id, service_id) VALUES (1, 9);
 GO
 ----------------------END OF DATA--------------------
+
